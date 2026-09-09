@@ -1,4 +1,4 @@
-# 🧠 AI-Based Cognitive Gaming & Memory Assistance Platform [prototype link](https://gowtham-projects-io.github.io/3d-kitchen-env/)
+# 🧠 AI-Based Cognitive Gaming & Memory Assistance Platform 
 
 A **3D cognitive gaming and memory assistance platform** designed to support elderly users, including people experiencing dementia-related memory difficulties.
 
