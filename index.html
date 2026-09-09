@@ -1,0 +1,1477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Warm Kitchen — Cognitive Memory Game (NER Elder Care) — VR Ready</title>
+<style>
+  :root{
+    --ui-scale: 1;
+    --bg: #eef2ee;
+    --panel: rgba(255,255,255,0.94);
+    --panel-border: #cfd9cf;
+    --text: #26332b;
+    --text-soft: #55645a;
+    --accent: #3f7d6e;        /* warm sage */
+    --accent-dark: #2c5c50;
+    --gold: #d9a441;          /* warm gold, used for prompts/attention */
+    --good: #2f8f4e;
+    --good-bg: #e5f4e8;
+    --bad: #b3552f;
+    --bad-bg: #fbeae1;
+    --radius: 18px;
+  }
+  body.high-contrast{
+    --bg: #0e1210;
+    --panel: rgba(20,24,20,0.96);
+    --panel-border: #4a5a4c;
+    --text: #f5f8f4;
+    --text-soft: #cfd8cf;
+    --accent: #57c9a8;
+    --accent-dark: #2fae86;
+    --gold: #ffcf5c;
+    --good: #63e08a;
+    --good-bg: #163722;
+    --bad: #ff9a6b;
+    --bad-bg: #3a1f14;
+  }
+  html, body { margin:0; padding:0; overflow:hidden; height:100%; background:var(--bg);
+    font-family: 'Segoe UI', Roboto, Arial, sans-serif; color:var(--text); }
+
+  /* ---------- top UI (flat / desktop screen only — hidden while in a VR headset,
+       since the headset renders its own 3D HUD instead, see the module script) ---------- */
+  #ui-top {
+    position:fixed; top:0; left:0; width:100%;
+    display:flex; flex-direction:column; align-items:center;
+    pointer-events:none; z-index:20; padding-top:calc(14px * var(--ui-scale));
+  }
+  #prompt {
+    padding: calc(14px * var(--ui-scale)) calc(30px * var(--ui-scale));
+    background:var(--panel); border:2px solid var(--panel-border);
+    border-radius:var(--radius); box-shadow:0 6px 18px rgba(0,0,0,0.15);
+    font-size:calc(24px * var(--ui-scale)); font-weight:700; color:var(--text);
+    text-align:center; max-width:86%; pointer-events:auto; line-height:1.35;
+  }
+  #feedback {
+    margin-top:calc(10px * var(--ui-scale)); padding:calc(8px * var(--ui-scale)) calc(22px * var(--ui-scale));
+    border-radius:14px; font-size:calc(20px * var(--ui-scale)); font-weight:700; min-height:calc(30px * var(--ui-scale));
+    pointer-events:none; opacity:0; transition:opacity .25s ease;
+  }
+  #feedback.show { opacity:1; }
+  #feedback.good { background:var(--good-bg); color:var(--good); }
+  #feedback.bad  { background:var(--bad-bg);  color:var(--bad); }
+
+  #session-badge{
+    margin-top:calc(8px * var(--ui-scale)); pointer-events:none;
+    font-size:calc(14px * var(--ui-scale)); color:var(--text-soft); font-weight:600;
+    background:var(--panel); border:1px solid var(--panel-border);
+    padding:4px 14px; border-radius:20px;
+  }
+
+  /* ---------- choice / MCQ panel (flat screen) ---------- */
+  #choicePanel{
+    position:fixed; left:50%; top:50%; transform:translate(-50%,-50%);
+    background:var(--panel); border:2px solid var(--panel-border); border-radius:var(--radius);
+    padding:calc(20px*var(--ui-scale)) calc(26px*var(--ui-scale)); z-index:30; display:none;
+    box-shadow:0 10px 30px rgba(0,0,0,0.25); max-width:90%;
+  }
+  #choicePanel h3{ margin:0 0 calc(14px*var(--ui-scale)) 0; font-size:calc(21px*var(--ui-scale)); text-align:center;}
+  #choiceOptions{ display:flex; flex-wrap:wrap; gap:12px; justify-content:center; }
+  .choice-btn{
+    font-size:calc(18px*var(--ui-scale)); font-weight:700; padding:calc(14px*var(--ui-scale)) calc(20px*var(--ui-scale));
+    border-radius:14px; border:2px solid var(--accent); background:white; color:var(--accent-dark);
+    cursor:pointer; min-width:120px;
+  }
+  body.high-contrast .choice-btn{ background:#152018; }
+  .choice-btn:hover{ background:var(--accent); color:white; }
+  .choice-btn.selected{ background:var(--gold); border-color:var(--gold); color:#3a2b00; }
+
+  /* ---------- bottom controls (flat screen) ---------- */
+  #controls {
+    position:fixed; bottom:calc(14px*var(--ui-scale)); left:0; width:100%;
+    display:flex; justify-content:center; flex-wrap:wrap; gap:calc(10px*var(--ui-scale)); z-index:20; pointer-events:none;
+  }
+  button.game-btn {
+    pointer-events:auto; border:none; border-radius:14px; padding:calc(14px*var(--ui-scale)) calc(20px*var(--ui-scale));
+    font-size:calc(17px*var(--ui-scale)); font-weight:700; cursor:pointer;
+    background:var(--accent); color:white; box-shadow:0 4px 10px rgba(0,0,0,0.2);
+  }
+  button.game-btn:hover { background:var(--accent-dark); }
+  button.game-btn.secondary{ background:#7a8a80; }
+  button.game-btn.secondary:hover{ background:#5f6e64; }
+
+  #vrbtn-wrap { position:fixed; bottom:calc(78px*var(--ui-scale)); left:0; width:100%; display:flex; justify-content:center; z-index:20; }
+  #vrNotice {
+    pointer-events:auto; border:none; border-radius:12px; padding:10px 18px;
+    font-size:14px; font-weight:600; cursor:pointer;
+    background:#f1a208; color:#2a2a2a; box-shadow:0 3px 8px rgba(0,0,0,0.2);
+    display:none; text-align:center; max-width:90%;
+  }
+  #vrHint{
+    position:fixed; bottom:calc(120px*var(--ui-scale)); left:0; width:100%; text-align:center;
+    pointer-events:none; z-index:20; font-size:13px; color:var(--text-soft); display:none;
+  }
+
+  #label {
+    position:fixed; pointer-events:none; z-index:15;
+    background:rgba(29,53,87,0.92); color:white; padding:5px 12px;
+    border-radius:8px; font-size:calc(15px*var(--ui-scale)); font-weight:700; display:none;
+    transform:translate(-50%, -150%);
+  }
+
+  /* ---------- settings panel ---------- */
+  #settingsPanel{
+    position:fixed; top:calc(16px*var(--ui-scale)); right:calc(16px*var(--ui-scale));
+    background:var(--panel); border:2px solid var(--panel-border); border-radius:var(--radius);
+    padding:16px 18px; z-index:25; width:270px; display:none; box-shadow:0 8px 22px rgba(0,0,0,0.2);
+  }
+  #settingsPanel h3{ margin:2px 0 12px 0; font-size:18px; }
+  #settingsPanel label{ display:block; font-size:14px; font-weight:600; margin-top:12px; color:var(--text-soft); }
+  #settingsPanel select, #settingsPanel input[type=range]{ width:100%; margin-top:4px; }
+  #settingsPanel .row{ display:flex; align-items:center; justify-content:space-between; margin-top:12px;}
+  #closeSettings{ position:absolute; top:10px; right:12px; background:none; border:none; font-size:18px; cursor:pointer; color:var(--text-soft); }
+  #exportBtn{ margin-top:16px; width:100%; }
+
+  #topLeftBtns{ position:fixed; top:calc(16px*var(--ui-scale)); left:calc(16px*var(--ui-scale)); z-index:25; display:flex; gap:8px; }
+  #topLeftBtns button{
+    pointer-events:auto; border:none; border-radius:12px; padding:10px 14px; font-size:15px; font-weight:700;
+    background:var(--panel); border:1px solid var(--panel-border); color:var(--text); cursor:pointer;
+    box-shadow:0 3px 8px rgba(0,0,0,0.15);
+  }
+
+  /* While an XR (VR) session is live, the flat 2D overlay is invisible to the headset wearer
+     anyway, but we still hide it so a spectator on the flat screen sees a clean pass-through view. */
+  body.xr-active #ui-top, body.xr-active #controls, body.xr-active #choicePanel,
+  body.xr-active #settingsPanel, body.xr-active #topLeftBtns { display:none !important; }
+</style>
+</head>
+<body>
+
+<div id="topLeftBtns">
+  <button id="settingsBtn" title="Settings">⚙️ Settings</button>
+</div>
+
+<div id="ui-top">
+  <div id="prompt">Welcome! Tap "🎮 Start Game" to begin.</div>
+  <div id="feedback"></div>
+  <div id="session-badge">Score: 0 &nbsp;|&nbsp; Difficulty: Easy &nbsp;|&nbsp; Mode: Object Recognition</div>
+</div>
+
+<div id="choicePanel">
+  <h3 id="choiceTitle">Question</h3>
+  <div id="choiceOptions"></div>
+</div>
+
+<div id="controls">
+  <button class="game-btn" id="startBtn">🎮 Start Game</button>
+  <button class="game-btn" id="newRoundBtn">🔄 New Round</button>
+  <button class="game-btn secondary" id="repeatBtn">🔊 Repeat</button>
+  <button class="game-btn secondary" id="freeBtn">🗺️ Free Explore</button>
+  <button class="game-btn secondary" id="homeBtn">🏠 Home</button>
+</div>
+
+<div id="vrbtn-wrap"></div>
+<button id="vrNotice" onclick="window.open(window.location.href, '_blank')">
+  ⚠️ VR is blocked in this embedded preview. Tap to open in a new tab and enable VR.
+</button>
+<div id="vrHint">Put on your headset and use the controller trigger to point &amp; select — a 3D panel with the prompt, feedback and buttons appears in front of you.</div>
+<div id="label"></div>
+
+<div id="settingsPanel">
+  <button id="closeSettings">✕</button>
+  <h3>Settings</h3>
+
+  <label>Game Mode</label>
+  <select id="modeSelect">
+    <option value="recognition">Object Recognition</option>
+    <option value="location">Object Location Memory</option>
+    <option value="sequence">Sequence Memory</option>
+    <option value="matching">Object Matching</option>
+    <option value="category">Category Recognition</option>
+    <option value="shortterm">Short-Term Memory</option>
+  </select>
+
+  <label>Difficulty</label>
+  <select id="difficultySelect">
+    <option value="auto" selected>Auto (adapts to you)</option>
+    <option value="easy">Easy</option>
+    <option value="medium">Medium</option>
+    <option value="hard">Hard</option>
+  </select>
+
+  <label>Text Size</label>
+  <input type="range" id="fontSlider" min="0.85" max="1.5" step="0.05" value="1">
+
+  <label>Voice Volume</label>
+  <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="1">
+
+  <label>Speech Speed</label>
+  <input type="range" id="speedSlider" min="0.7" max="1.2" step="0.05" value="0.92">
+
+  <div class="row">
+    <label style="margin:0;">High-Contrast Mode</label>
+    <input type="checkbox" id="contrastToggle">
+  </div>
+
+  <button class="game-btn" id="exportBtn">⬇️ Download Session Data</button>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { VRButton } from 'three/addons/webxr/VRButton.js';
+import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
+
+/* =========================================================================
+   WARM KITCHEN — COGNITIVE GAMING & MEMORY ASSISTANCE PLATFORM (VR READY)
+   Built for elderly / dementia-care users (North Eastern Region pilot).
+
+   WHY THE ORIGINAL VERSION "DIDN'T SUPPORT VR":
+   It had a working VRButton + controller raycasting, but every piece of the
+   game's UI (the prompt, feedback, score badge, and multiple-choice panel)
+   was plain 2D HTML overlaid on the page. That HTML is only visible on the
+   flat monitor — a person wearing a headset never sees it, so the game was
+   unplayable in VR even though the button to enter VR worked.
+
+   This version adds a parallel, in-headset UI made of real 3D objects
+   (canvas-textured planes attached to the camera) that shows the same
+   prompt / feedback / score / choice buttons, plus a small always-on menu
+   (Start·Next, Repeat, Home), and controller-ray selection for all of it.
+   The original flat HTML UI is kept for desktop/mobile use and is simply
+   hidden while an XR session is active.
+
+   Structure of this file:
+     1. Settings / accessibility state
+     2. Scene bootstrap (renderer, camera, lights, controls, VR, controllers)
+     3. Room + furniture builder (buildRoom)
+     4. Interactive game-object catalogue (createInteractiveObject)
+     5. Speech helper
+     6. Session / analytics data layer  (AI-backend-ready event log)
+     7. In-VR 3D UI layer (HUD panel, choice panel, always-on menu)
+     8. Game engine: 6 cognitive game modes + adaptive difficulty
+     9. UI wiring (buttons, settings panel, MCQ panel — flat + VR)
+    10. Interaction (pointer + VR controller raycasting)
+    11. Render loop / boot
+   ========================================================================= */
+
+/* ----------------------------- 1. SETTINGS ------------------------------ */
+
+const settings = {
+  fontScale: 1,
+  voiceVolume: 1,
+  speechRate: 0.92,
+  highContrast: false,
+  difficultyMode: 'auto',   // 'auto' | 'easy' | 'medium' | 'hard'
+  gameMode: 'recognition'
+};
+
+const DIFFICULTY_CONFIG = {
+  easy:   { poolSize: 3, viewSeconds: 9,  memoryDelay: 5,  seqLen: 2 },
+  medium: { poolSize: 5, viewSeconds: 6,  memoryDelay: 8,  seqLen: 3 },
+  hard:   { poolSize: 7, viewSeconds: 4,  memoryDelay: 12, seqLen: 4 }
+};
+let currentDifficulty = 'easy'; // used when difficultyMode === 'auto'
+let streak = { correct: 0, incorrect: 0 };
+
+function activeDifficulty(){
+  return settings.difficultyMode === 'auto' ? currentDifficulty : settings.difficultyMode;
+}
+function diffCfg(){ return DIFFICULTY_CONFIG[activeDifficulty()]; }
+
+/* ------------------------- 2. SCENE BOOTSTRAP --------------------------- */
+
+let scene, camera, renderer, controls, raycaster;
+let controllers = [];
+let controllerGrips = [];
+let inVRSession = false;
+const objectsList = [];      // all interactive object groups
+const objectsByName = {};    // name -> group
+let mouse = new THREE.Vector2();
+const labelDiv = document.getElementById('label');
+
+function init(){
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xeaf1ea);
+  scene.fog = new THREE.Fog(0xeaf1ea, 9, 16);
+
+  camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.05, 100);
+  camera.position.set(0, 1.7, 4.4);
+  // The camera must be part of the scene graph so that objects parented to
+  // it (our in-VR HUD / menu / choice panels) actually get rendered, both
+  // on the flat screen and inside a WebXR headset.
+  scene.add(camera);
+
+  renderer = new THREE.WebGLRenderer({ antialias:true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.xr.enabled = true;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  document.body.appendChild(renderer.domElement);
+
+  setupVRAccess();
+
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.target.set(0, 1.1, -0.4);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.minDistance = 1.6;
+  controls.maxDistance = 6.5;
+  controls.maxPolarAngle = Math.PI * 0.49;
+  controls.update();
+
+  // Soft, comfortable lighting -- no harsh reflections, no flashing
+  const hemi = new THREE.HemisphereLight(0xffffff, 0xd9e2d6, 1.0);
+  scene.add(hemi);
+  const sun = new THREE.DirectionalLight(0xfff2d9, 1.0); // warm window light
+  sun.position.set(-3, 4.2, 2.4);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(1024, 1024);
+  sun.shadow.camera.left = -4; sun.shadow.camera.right = 4;
+  sun.shadow.camera.top = 4; sun.shadow.camera.bottom = -4;
+  scene.add(sun);
+  const fill = new THREE.DirectionalLight(0xffffff, 0.35);
+  fill.position.set(3, 2.4, -1.5);
+  scene.add(fill);
+  const ceilingLamp = new THREE.PointLight(0xffe4b0, 0.6, 8, 2);
+  ceilingLamp.position.set(0, 2.55, -0.4);
+  scene.add(ceilingLamp);
+
+  raycaster = new THREE.Raycaster();
+
+  window.addEventListener('resize', onResize);
+  renderer.domElement.addEventListener('pointerdown', onPointerDown);
+
+  // VR controllers: pointing ray + a visible controller model + a small
+  // cursor dot that lands wherever the ray currently hits something.
+  const controllerModelFactory = new XRControllerModelFactory();
+  for (let i=0;i<2;i++){
+    const controller = renderer.xr.getController(i);
+    controller.addEventListener('selectstart', onVRSelect);
+    controller.addEventListener('connected', function(e){ this.userData.handedness = e.data.handedness; });
+    scene.add(controller);
+
+    const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,-1)]);
+    const line = new THREE.Line(geo, new THREE.LineBasicMaterial({color:0x3f7d6e}));
+    line.name = 'pointerRay';
+    line.scale.z = 2;
+    controller.add(line);
+
+    const cursor = new THREE.Mesh(
+      new THREE.SphereGeometry(0.012, 12, 10),
+      new THREE.MeshBasicMaterial({ color: 0xd9a441 })
+    );
+    cursor.position.z = -2;
+    cursor.name = 'cursorDot';
+    controller.add(cursor);
+
+    controllers.push(controller);
+
+    const grip = renderer.xr.getControllerGrip(i);
+    grip.add(controllerModelFactory.createControllerModel(grip));
+    scene.add(grip);
+    controllerGrips.push(grip);
+  }
+
+  // Toggle between the flat 2D UI and the in-headset 3D UI as the XR
+  // session starts/stops, and hand full camera control to the headset.
+  renderer.xr.addEventListener('sessionstart', ()=>{
+    inVRSession = true;
+    controls.enabled = false;
+    document.body.classList.add('xr-active');
+    setVRUIVisible(true);
+    refreshVRHUD();
+  });
+  renderer.xr.addEventListener('sessionend', ()=>{
+    inVRSession = false;
+    controls.enabled = true;
+    document.body.classList.remove('xr-active');
+    setVRUIVisible(false);
+  });
+}
+
+async function setupVRAccess(){
+  const noticeBtn = document.getElementById('vrNotice');
+  const hint = document.getElementById('vrHint');
+  const wrap = document.getElementById('vrbtn-wrap');
+  if (!('xr' in navigator)) return;
+  try {
+    const supported = await navigator.xr.isSessionSupported('immersive-vr');
+    if (supported){
+      wrap.appendChild(VRButton.createButton(renderer));
+      hint.style.display = 'block';
+    }
+  } catch (err) {
+    if (err && err.name === 'SecurityError') noticeBtn.style.display = 'block';
+  }
+}
+
+function onResize(){
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+/* --------------------- 3. ROOM + FURNITURE BUILDER ---------------------- */
+
+function mat(color, opts={}){
+  return new THREE.MeshStandardMaterial({ color, roughness: opts.roughness ?? 0.8, metalness: opts.metalness ?? 0.05 });
+}
+function box(w,h,d,color,x,y,z,opts={}){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat(color,opts));
+  m.position.set(x,y,z);
+  m.castShadow = true; m.receiveShadow = true;
+  if (opts.parent) opts.parent.add(m); else scene.add(m);
+  return m;
+}
+function cyl(rTop,rBot,h,color,x,y,z,opts={}){
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(rTop,rBot,h,opts.segments||20), mat(color,opts));
+  m.position.set(x,y,z);
+  m.castShadow = true; m.receiveShadow = true;
+  if (opts.parent) opts.parent.add(m); else scene.add(m);
+  return m;
+}
+
+function buildRoom(){
+  // Floor
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(12,12), mat(0xe6d9bd, {roughness:1}));
+  floor.rotation.x = -Math.PI/2;
+  floor.receiveShadow = true;
+  scene.add(floor);
+
+  // Back + side walls (light cream, calm, high contrast against wood/objects)
+  const wallMat = mat(0xf3ecdc, {roughness:1});
+  const backWall = new THREE.Mesh(new THREE.PlaneGeometry(9, 3.2), wallMat);
+  backWall.position.set(0, 1.6, -2.4); backWall.receiveShadow = true;
+  scene.add(backWall);
+  const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(6, 3.2), wallMat);
+  leftWall.rotation.y = Math.PI/2; leftWall.position.set(-3.4, 1.6, 0.5); leftWall.receiveShadow = true;
+  scene.add(leftWall);
+
+  // Window (soft warm light source) on back wall
+  box(1.3, 1.0, 0.05, 0xbfe3f2, -1.6, 1.9, -2.36, {roughness:0.2, metalness:0.1});
+  box(1.4, 1.1, 0.08, 0xffffff, -1.6, 1.9, -2.4, {roughness:0.9});
+  box(1.3, 1.0, 0.05, 0xbfe3f2, -1.6, 1.9, -2.35);
+
+  // Kitchen counter (base + top) along back wall
+  const counterY = 0.85;
+  box(3.6, 0.85, 0.62, 0xd8c8a6, 0.55, counterY/2, -2.05);       // lower cabinet block
+  box(3.7, 0.06, 0.66, 0xb98a52, 0.55, counterY+0.03, -2.05);    // countertop
+
+  // Cabinet doors (visual detail, minimal)
+  for (let i=0;i<3;i++){
+    box(1.0, 0.7, 0.03, 0xc7b48c, -0.6 + i*1.15, 0.45, -1.73);
+  }
+
+  // Upper cabinets
+  box(3.0, 0.65, 0.35, 0xd8c8a6, 0.6, 2.25, -2.2);
+  box(0.9, 0.5, 0.30, 0xd8c8a6, -1.6, 2.15, -2.2); // small unit near window
+
+  // Open shelf with a few storage containers (decorative, non-interactive)
+  box(0.9, 0.03, 0.28, 0x8a5c3a, 2.0, 1.55, -2.15);
+  cyl(0.06,0.06,0.16, 0xffffff, 1.8, 1.63, -2.15);
+  cyl(0.06,0.06,0.14, 0xf1c26b, 2.0, 1.62, -2.15);
+  cyl(0.06,0.06,0.18, 0xe0e0e0, 2.2, 1.64, -2.15);
+
+  // Sink (basin recessed into counter)
+  box(0.55, 0.05, 0.4, 0xcfd6d6, -0.5, counterY+0.02, -2.0, {metalness:0.3, roughness:0.4});
+  box(0.5, 0.10, 0.35, 0x9aa6a6, -0.5, counterY-0.02, -2.0, {metalness:0.4, roughness:0.3});
+  cyl(0.015,0.015,0.28, 0xb8bcbc, -0.5, counterY+0.22, -2.18, {metalness:0.6, roughness:0.2}); // faucet stem
+  box(0.18,0.02,0.02, 0xb8bcbc, -0.5, counterY+0.34, -2.1, {metalness:0.6, roughness:0.2});
+
+  // Stove / cooking area
+  box(0.62,0.06,0.5, 0x2b2b2b, 1.65, counterY+0.05, -2.0, {roughness:0.4});
+  [[-0.14,-0.12],[0.14,-0.12],[-0.14,0.12],[0.14,0.12]].forEach(([dx,dz])=>{
+    cyl(0.07,0.07,0.02, 0x555555, 1.65+dx, counterY+0.09, -2.0+dz, {roughness:0.5});
+  });
+
+  // Refrigerator
+  box(0.72,1.7,0.62, 0xf4f6f5, 3.05, 0.85, -1.9, {roughness:0.35, metalness:0.15});
+  box(0.03,0.35,0.03, 0x8f9a97, 2.72, 1.15, -1.6);
+
+  // Dining table + chairs (warm wood, rounded top)
+  cyl(0.55,0.55,0.06, 0xc79a63, 0, 0.78, 0.9, {segments:32});
+  [[-0.35,-0.35],[0.35,-0.35],[0,0.5]].forEach(([dx,dz])=>{
+    cyl(0.03,0.03,0.78, 0xa9744f, dx, 0.39, 0.9+dz);
+  });
+  const chairPositions = [[-0.9,0.55,0], [0.9,0.55,0], [0,1.65,Math.PI]];
+  chairPositions.forEach(([x,z,rot])=>{
+    const chair = new THREE.Group();
+    box(0.42,0.06,0.42,0x8a5c3a,0,0.45,0,{parent:chair});
+    box(0.42,0.5,0.05,0x8a5c3a,0,0.72,-0.19,{parent:chair});
+    [[-0.18,-0.18],[0.18,-0.18],[-0.18,0.18],[0.18,0.18]].forEach(([lx,lz])=>{
+      box(0.04,0.45,0.04,0x6f4a30, lx,0.22, lz, {parent:chair});
+    });
+    chair.position.set(x,0,z);
+    chair.rotation.y = rot;
+    scene.add(chair);
+  });
+
+  // Ceiling warm light fixture (visual)
+  const lampShade = new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.22,0.14,20,1,true),
+    new THREE.MeshStandardMaterial({color:0xfff0cf, emissive:0xffdca0, emissiveIntensity:0.5, side:THREE.DoubleSide}));
+  lampShade.position.set(0,2.55,-0.4);
+  scene.add(lampShade);
+
+  // Small indoor plant near window
+  const plant = new THREE.Group();
+  cyl(0.09,0.11,0.16,0xb9704a,0,0.08,0,{parent:plant});
+  const leafMat = mat(0x4f8f5a, {roughness:0.7});
+  for (let i=0;i<5;i++){
+    const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.09,10,8), leafMat);
+    leaf.scale.set(0.5,1.3,0.5);
+    leaf.position.set(Math.cos(i*1.3)*0.05, 0.24+i*0.02, Math.sin(i*1.3)*0.05);
+    leaf.rotation.z = i*0.5;
+    leaf.castShadow = true;
+    plant.add(leaf);
+  }
+  plant.position.set(-1.6, counterY+0.06, -1.85);
+  scene.add(plant);
+
+  // Simple wall decoration (framed accent square) on left wall
+  box(0.02,0.5,0.5, 0xffffff, -3.36, 1.8, 1.2);
+  box(0.015,0.42,0.42, 0x9dbfae, -3.35, 1.8, 1.2);
+
+  // Floor rug for warmth near the table
+  const rug = new THREE.Mesh(new THREE.CircleGeometry(1.1,32), mat(0xdac9a0,{roughness:1}));
+  rug.rotation.x = -Math.PI/2; rug.position.set(0,0.005,0.9); rug.receiveShadow = true;
+  scene.add(rug);
+}
+
+/* ------------------- 4. INTERACTIVE GAME-OBJECT CATALOGUE --------------- */
+
+function addShadow(o){ o.traverse(c => { if(c.isMesh){ c.castShadow = true; c.receiveShadow = true; }}); }
+
+function makeCup(){ const g=new THREE.Group();
+  cyl(0.12,0.10,0.16,0x8ecae6,0,0.08,0,{parent:g});
+  const h=new THREE.Mesh(new THREE.TorusGeometry(0.06,0.018,10,24,Math.PI*1.4), mat(0x8ecae6));
+  h.rotation.z=Math.PI/2; h.position.set(0.15,0.08,0); g.add(h); addShadow(g); return g; }
+
+function makeKettle(){ const g=new THREE.Group();
+  const body=new THREE.Mesh(new THREE.SphereGeometry(0.16,24,16), mat(0xe63946)); body.scale.set(1,0.9,1); body.position.y=0.18; g.add(body);
+  const spout=new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.035,0.16,12), mat(0xe63946)); spout.position.set(0.17,0.22,0); spout.rotation.z=Math.PI/3.2; g.add(spout);
+  const lid=new THREE.Mesh(new THREE.SphereGeometry(0.05,16,12), mat(0xd62839)); lid.position.set(0,0.33,0); g.add(lid);
+  const knob=new THREE.Mesh(new THREE.SphereGeometry(0.018,10,8), mat(0x1d3557)); knob.position.set(0,0.375,0); g.add(knob);
+  const handle=new THREE.Mesh(new THREE.TorusGeometry(0.09,0.016,10,20,Math.PI*1.3), mat(0x2b2b2b)); handle.rotation.y=Math.PI/2; handle.position.set(-0.15,0.26,0); g.add(handle);
+  addShadow(g); return g; }
+
+function makeSpoon(){ const g=new THREE.Group();
+  const bowl=new THREE.Mesh(new THREE.SphereGeometry(0.045,16,12), mat(0xc0c0c0,{metalness:0.4})); bowl.scale.set(1,0.55,1.4); bowl.position.set(0,0.02,0.12); g.add(bowl);
+  const handle=new THREE.Mesh(new THREE.CapsuleGeometry(0.012,0.22,4,8), mat(0xc0c0c0,{metalness:0.4})); handle.rotation.x=Math.PI/2; handle.position.set(0,0.02,-0.08); g.add(handle);
+  g.rotation.x=-0.15; addShadow(g); return g; }
+
+function makePlate(){ const g=new THREE.Group();
+  cyl(0.18,0.16,0.02,0xffffff,0,0,0,{parent:g,segments:32});
+  const rim=new THREE.Mesh(new THREE.TorusGeometry(0.17,0.012,10,32), mat(0x8ecae6)); rim.rotation.x=Math.PI/2; rim.position.y=0.01; g.add(rim);
+  addShadow(g); return g; }
+
+function makeBowl(){ const g=new THREE.Group();
+  const s=new THREE.Mesh(new THREE.SphereGeometry(0.14,24,16,0,Math.PI*2,0,Math.PI/1.7), mat(0xffd166)); s.rotation.x=Math.PI; s.position.y=0.10; g.add(s);
+  addShadow(g); return g; }
+
+function makeContainer(capColor){ return function(){ const g=new THREE.Group();
+  cyl(0.06,0.06,0.16,0xffffff,0,0.08,0,{parent:g});
+  cyl(0.062,0.062,0.03,capColor,0,0.175,0,{parent:g});
+  addShadow(g); return g; }; }
+
+function makeBread(){ const g=new THREE.Group();
+  const loaf=new THREE.Mesh(new THREE.CapsuleGeometry(0.09,0.18,6,10), mat(0xd6a15c)); loaf.rotation.z=Math.PI/2; loaf.position.y=0.09; g.add(loaf);
+  addShadow(g); return g; }
+
+function makeGlass(){ const g=new THREE.Group();
+  const glassMat = new THREE.MeshPhysicalMaterial({color:0xbde0fe, transparent:true, opacity:0.55, roughness:0.15, transmission:0.4});
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.08,0.2,24), glassMat); body.position.y=0.1; g.add(body);
+  addShadow(g); return g; }
+
+function makeKnife(){ const g=new THREE.Group();
+  const blade=new THREE.Mesh(new THREE.BoxGeometry(0.22,0.03,0.005), mat(0xc7c7c7,{metalness:0.4})); blade.position.set(0.05,0.05,0); g.add(blade);
+  const handle=new THREE.Mesh(new THREE.CapsuleGeometry(0.018,0.14,4,8), mat(0x2b2b2b)); handle.rotation.z=Math.PI/2; handle.position.set(-0.12,0.04,0); g.add(handle);
+  addShadow(g); return g; }
+
+function makeTray(){ const g=new THREE.Group();
+  box(0.5,0.02,0.34,0xa9744f,0,0,0,{parent:g});
+  const wallMat=mat(0x8a5c3a);
+  [[0,0.02,0.16,0.5,0.04,0.02],[0,0.02,-0.16,0.5,0.04,0.02],[0.24,0.02,0,0.02,0.04,0.34],[-0.24,0.02,0,0.02,0.04,0.34]].forEach(([x,y,z,w,h,d])=>{
+    const w1=new THREE.Mesh(new THREE.BoxGeometry(w,h,d), wallMat); w1.position.set(x,y,z); g.add(w1);
+  });
+  addShadow(g); return g; }
+
+function makePot(){ const g=new THREE.Group();
+  cyl(0.15,0.15,0.16,0xb8bcbc,0,0.09,0,{parent:g,metalness:0.4});
+  const h1=new THREE.Mesh(new THREE.TorusGeometry(0.03,0.012,8,16,Math.PI), mat(0x2b2b2b)); h1.rotation.y=Math.PI/2; h1.position.set(0.16,0.13,0); g.add(h1);
+  const h2=h1.clone(); h2.position.x=-0.16; g.add(h2);
+  const lid=new THREE.Mesh(new THREE.CylinderGeometry(0.155,0.155,0.02,24), mat(0xd6d9d9,{metalness:0.4})); lid.position.y=0.185; g.add(lid);
+  const knob=new THREE.Mesh(new THREE.SphereGeometry(0.02,10,8), mat(0x2b2b2b)); knob.position.y=0.21; g.add(knob);
+  addShadow(g); return g; }
+
+function makePan(){ const g=new THREE.Group();
+  cyl(0.16,0.14,0.05,0x555555,0,0.03,0,{parent:g,metalness:0.5});
+  const handle=new THREE.Mesh(new THREE.CylinderGeometry(0.015,0.015,0.28,10), mat(0x2b2b2b)); handle.rotation.z=Math.PI/2; handle.position.set(0.28,0.04,0); g.add(handle);
+  addShadow(g); return g; }
+
+function makeWaterBottle(){ const g=new THREE.Group();
+  const bottleMat = new THREE.MeshPhysicalMaterial({color:0xcdeeff, transparent:true, opacity:0.5, roughness:0.1, transmission:0.5});
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,0.24,20), bottleMat); body.position.y=0.13; g.add(body);
+  const cap=new THREE.Mesh(new THREE.CylinderGeometry(0.025,0.025,0.03,14), mat(0x1d6fa5)); cap.position.y=0.26; g.add(cap);
+  addShadow(g); return g; }
+
+function makeCuttingBoard(){ const g=new THREE.Group();
+  box(0.32,0.02,0.2,0xc79a63,0,0.01,0,{parent:g});
+  addShadow(g); return g; }
+
+function makeVegetableBasket(){ const g=new THREE.Group();
+  cyl(0.15,0.11,0.13,0xb5773b,0,0.065,0,{parent:g});
+  const colors=[0xe63946,0xf4a261,0x81b29a];
+  for (let i=0;i<5;i++){
+    const veg=new THREE.Mesh(new THREE.SphereGeometry(0.035,10,8), mat(colors[i%colors.length]));
+    veg.position.set((Math.random()-0.5)*0.16, 0.13+Math.random()*0.03, (Math.random()-0.5)*0.16);
+    g.add(veg);
+  }
+  addShadow(g); return g; }
+
+/* ---- Object catalogue: category + description drive the game questions ---- */
+
+const OBJECT_DEFS = [
+  { name:'Cup', friendly:'cup', category:'drinking', build:makeCup, pos:[-1.25,0.91,-1.8],
+    description:'A cup is used for drinking tea or water.', options:['Drinking tea','Cooking rice','Cutting vegetables'] },
+  { name:'Kettle', friendly:'kettle', category:'cooking', build:makeKettle, pos:[-0.55,0.91,-1.9],
+    description:'A kettle is used for boiling water.', options:['Boiling water','Washing plates','Storing rice'] },
+  { name:'Spoon', friendly:'spoon', category:'cooking', build:makeSpoon, pos:[0.05,0.91,-1.85],
+    description:'A spoon is used for eating or stirring food.', options:['Eating and stirring food','Cutting bread','Drinking water'] },
+  { name:'Plate', friendly:'plate', category:'serving', build:makePlate, pos:[0.65,0.91,-1.9],
+    description:'A plate is used for serving food.', options:['Serving food','Boiling water','Storing spices'] },
+  { name:'Bowl', friendly:'bowl', category:'serving', build:makeBowl, pos:[1.2,0.91,-1.8],
+    description:'A bowl is used for serving rice or curry.', options:['Serving rice or curry','Cutting vegetables','Drinking tea'] },
+  { name:'SaltContainer', friendly:'salt container', category:'storage', build:makeContainer(0x06d6a0), pos:[-1.55,0.91,-1.55],
+    description:'This container is used for storing salt.', options:['Storing salt','Drinking water','Serving food'] },
+  { name:'SugarContainer', friendly:'sugar container', category:'storage', build:makeContainer(0xffb703), pos:[-1.3,0.91,-1.55],
+    description:'This container is used for storing sugar.', options:['Storing sugar','Cutting bread','Boiling water'] },
+  { name:'TeaContainer', friendly:'tea container', category:'storage', build:makeContainer(0x6a4423), pos:[-1.05,0.91,-1.55],
+    description:'This container is used for storing tea leaves.', options:['Storing tea leaves','Serving rice','Washing vegetables'] },
+  { name:'Bread', friendly:'bread', category:'food', build:makeBread, pos:[-0.6,0.91,-1.55],
+    description:'Bread is a common breakfast food.', options:['Eating for breakfast','Cutting vegetables','Boiling water'] },
+  { name:'Glass', friendly:'drinking glass', category:'drinking', build:makeGlass, pos:[0.1,0.91,-1.55],
+    description:'A glass is used for drinking water.', options:['Drinking water','Cooking rice','Storing salt'] },
+  { name:'WaterBottle', friendly:'water bottle', category:'drinking', build:makeWaterBottle, pos:[0.4,0.91,-1.55],
+    description:'A water bottle is used for carrying drinking water.', options:['Carrying drinking water','Frying food','Serving rice'] },
+  { name:'KitchenKnife', friendly:'kitchen knife', category:'cutting', build:makeKnife, pos:[0.7,0.91,-1.55],
+    description:'A knife is used for cutting vegetables.', options:['Cutting vegetables','Drinking tea','Storing sugar'] },
+  { name:'CuttingBoard', friendly:'cutting board', category:'cutting', build:makeCuttingBoard, pos:[0.95,0.905,-1.55],
+    description:'A cutting board is used underneath while cutting food.', options:['Cutting food safely','Boiling water','Serving tea'] },
+  { name:'Pot', friendly:'cooking pot', category:'cooking', build:makePot, pos:[1.4,0.91,-1.55],
+    description:'A pot is used for cooking curry or dal.', options:['Cooking curry or dal','Drinking water','Storing bread'] },
+  { name:'Pan', friendly:'frying pan', category:'cooking', build:makePan, pos:[1.75,0.91,-1.55],
+    description:'A pan is used for frying food.', options:['Frying food','Storing tea','Drinking water'] },
+  { name:'RiceContainer', friendly:'rice container', category:'storage', build:makeContainer(0xffffff), pos:[2.0,0.91,-1.75],
+    description:'This container is used for storing rice.', options:['Storing rice','Cutting bread','Drinking tea'] },
+  { name:'VegetableBasket', friendly:'vegetable basket', category:'food', build:makeVegetableBasket, pos:[-0.35,0.79,0.85],
+    description:'A basket used for keeping fresh vegetables.', options:['Keeping fresh vegetables','Boiling water','Serving tea'] },
+  { name:'KitchenTray', friendly:'kitchen tray', category:'serving', build:makeTray, pos:[0.35,0.79,0.85],
+    description:'A tray is used for carrying cups and food together.', options:['Carrying cups and food','Cutting vegetables','Storing rice'] }
+];
+
+function buildObjects(){
+  OBJECT_DEFS.forEach(def => {
+    const group = def.build();
+    group.position.set(def.pos[0], def.pos[1], def.pos[2]);
+    group.userData = {
+      name: def.name, friendly: def.friendly, category: def.category,
+      description: def.description, options: def.options,
+      baseScale: group.scale.clone(), homePos: group.position.clone(),
+      baseEmissive: new Map()
+    };
+    // remember original material colors so we can highlight/reset cleanly
+    group.traverse(o=>{
+      if (o.isMesh && o.material && 'emissive' in o.material){
+        group.userData.baseEmissive.set(o, o.material.emissive.clone());
+      }
+    });
+    scene.add(group);
+    objectsList.push(group);
+    objectsByName[def.name] = group;
+  });
+}
+
+function setHighlight(grp, on, color=0xffd166){
+  grp.traverse(o=>{
+    if (o.isMesh && o.material && 'emissive' in o.material){
+      o.material.emissive = on ? new THREE.Color(color) : grp.userData.baseEmissive.get(o).clone();
+      o.material.emissiveIntensity = on ? 0.6 : 0;
+    }
+  });
+}
+function bounce(grp){
+  const base = grp.userData.baseScale;
+  grp.scale.set(base.x*1.22, base.y*1.22, base.z*1.22);
+  setTimeout(()=> grp.scale.copy(base), 260);
+}
+
+/* ------------------------------ 5. SPEECH -------------------------------- */
+
+function speak(text){
+  if (!('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.rate = settings.speechRate;
+  u.volume = settings.voiceVolume;
+  u.pitch = 1.0;
+  window.speechSynthesis.speak(u);
+}
+
+/* ------------------- 6. SESSION / ANALYTICS DATA LAYER ------------------- */
+/* Structured events ready to POST to a FastAPI + AI/ML backend later. */
+
+const sessionEvents = [];
+const sessionInfo = { userId: 'user_001', sessionStart: new Date().toISOString() };
+let sessionScore = 0;
+
+function recordEvent({ gameType, object, correct, responseTime, attempts }){
+  const evt = {
+    userId: sessionInfo.userId,
+    gameType,
+    object,
+    correct: !!correct,
+    responseTime: Number(responseTime.toFixed(2)),
+    attempts,
+    difficulty: activeDifficulty(),
+    timestamp: new Date().toISOString()
+  };
+  sessionEvents.push(evt);
+  if (correct) sessionScore += 10; else sessionScore = Math.max(0, sessionScore - 2);
+  updateBadge();
+  adaptDifficulty(correct);
+  return evt;
+}
+
+function adaptDifficulty(correct){
+  if (settings.difficultyMode !== 'auto') return;
+  if (correct){ streak.correct++; streak.incorrect = 0; }
+  else { streak.incorrect++; streak.correct = 0; }
+  const order = ['easy','medium','hard'];
+  let idx = order.indexOf(currentDifficulty);
+  if (streak.correct >= 3){ idx = Math.min(idx+1, 2); streak.correct = 0; }
+  if (streak.incorrect >= 2){ idx = Math.max(idx-1, 0); streak.incorrect = 0; }
+  currentDifficulty = order[idx];
+}
+
+function updateBadge(){
+  const modeLabels = { recognition:'Object Recognition', location:'Location Memory', sequence:'Sequence Memory',
+    matching:'Object Matching', category:'Category Recognition', shortterm:'Short-Term Memory' };
+  vrBadgeText = `Score: ${sessionScore}   Difficulty: ${cap(activeDifficulty())}   Mode: ${modeLabels[settings.gameMode]}`;
+  document.getElementById('session-badge').textContent =
+    `Score: ${sessionScore}  |  Difficulty: ${cap(activeDifficulty())}  |  Mode: ${modeLabels[settings.gameMode]}`;
+  refreshVRHUD();
+}
+function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+
+function exportSessionData(){
+  const payload = { session: sessionInfo, events: sessionEvents, finalScore: sessionScore };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `cognitive_session_${Date.now()}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/* ===================== 7. IN-VR 3D UI LAYER ============================= */
+/* Everything the flat #ui-top / #choicePanel / #controls elements show is
+   mirrored here as real 3D objects attached to the camera, so it is visible
+   and selectable from inside a headset. Canvas textures are used for text
+   because WebXR cannot render DOM elements directly. */
+
+let vrHUDGroup, vrHUDCanvas, vrHUDCtx, vrHUDTexture, vrHUDMesh;
+let vrPanelGroup = null;          // 3D choice / MCQ panel (built per-question)
+let vrInteractiveButtons = [];    // clickable meshes inside vrPanelGroup
+let vrMenuGroup = null;           // always-on Start/Repeat/Home menu
+let vrMenuButtons = [];
+
+let currentPromptText = 'Welcome! Point the controller and pull the trigger to begin.';
+let currentFeedbackText = '';
+let currentFeedbackOk = null;
+let vrBadgeText = 'Score: 0   Difficulty: Easy   Mode: Object Recognition';
+
+let currentChoiceCallback = null;   // single-select MCQ callback
+let currentMultiCallback = null;    // multi-select confirm callback
+let multiSelectedValues = new Set();
+let vrDomBtnMap = null;             // keeps VR button taps in sync with the flat DOM buttons
+
+function roundRect(ctx,x,y,w,h,r){
+  ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+}
+function wrapText(ctx, text, x, y, maxWidth, lineHeight){
+  const words = String(text).split(' ');
+  let line=''; const lines=[];
+  for (const w of words){
+    const test = line + w + ' ';
+    if (ctx.measureText(test).width > maxWidth && line){ lines.push(line); line = w+' '; }
+    else line = test;
+  }
+  lines.push(line);
+  const startY = y - (lines.length-1)*lineHeight/2;
+  lines.forEach((l,i)=> ctx.fillText(l.trim(), x, startY + i*lineHeight));
+}
+
+function makeTextCanvas(text, w, h, fontSize, isButton=false, bg=null){
+  const c = document.createElement('canvas'); c.width=w; c.height=h;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = bg || (isButton ? '#ffffff' : 'rgba(255,255,255,0.95)');
+  roundRect(ctx,4,4,w-8,h-8,24); ctx.fill();
+  ctx.strokeStyle = '#3f7d6e'; ctx.lineWidth = 6;
+  roundRect(ctx,4,4,w-8,h-8,24); ctx.stroke();
+  ctx.fillStyle = '#2c5c50';
+  ctx.font = `bold ${fontSize}px Segoe UI, Arial`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  wrapText(ctx, text, w/2, h/2, w-40, fontSize+8);
+  return c;
+}
+
+function createVRHUD(){
+  vrHUDCanvas = document.createElement('canvas');
+  vrHUDCanvas.width = 1024; vrHUDCanvas.height = 340;
+  vrHUDCtx = vrHUDCanvas.getContext('2d');
+  vrHUDTexture = new THREE.CanvasTexture(vrHUDCanvas);
+  const material = new THREE.MeshBasicMaterial({ map: vrHUDTexture, transparent:true, depthTest:false });
+  const geo = new THREE.PlaneGeometry(1.6, 0.53);
+  vrHUDMesh = new THREE.Mesh(geo, material);
+  vrHUDMesh.renderOrder = 999;
+  vrHUDMesh.position.set(0, 0.42, -1.35);
+  vrHUDGroup = new THREE.Group();
+  vrHUDGroup.add(vrHUDMesh);
+  vrHUDGroup.visible = false;
+  camera.add(vrHUDGroup);
+  drawVRHUD();
+}
+
+function drawVRHUD(){
+  if (!vrHUDCtx) return;
+  const ctx = vrHUDCtx;
+  const W = vrHUDCanvas.width, H = vrHUDCanvas.height;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = 'rgba(255,255,255,0.96)';
+  roundRect(ctx,10,10,W-20,H-20,30); ctx.fill();
+  ctx.strokeStyle = '#cfd9cf'; ctx.lineWidth = 4;
+  roundRect(ctx,10,10,W-20,H-20,30); ctx.stroke();
+
+  ctx.fillStyle = '#26332b';
+  ctx.font = 'bold 44px Segoe UI, Arial';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  wrapText(ctx, currentPromptText, W/2, 100, W-90, 52);
+
+  if (currentFeedbackText){
+    ctx.font = 'bold 36px Segoe UI, Arial';
+    ctx.fillStyle = currentFeedbackOk === true ? '#2f8f4e' : currentFeedbackOk === false ? '#b3552f' : '#55645a';
+    wrapText(ctx, currentFeedbackText, W/2, 215, W-90, 42);
+  }
+
+  ctx.font = '600 26px Segoe UI, Arial';
+  ctx.fillStyle = '#55645a';
+  ctx.fillText(vrBadgeText, W/2, H-32);
+
+  vrHUDTexture.needsUpdate = true;
+}
+function refreshVRHUD(){ drawVRHUD(); }
+
+function createVRMenu(){
+  vrMenuGroup = new THREE.Group();
+  vrMenuGroup.position.set(0, -0.34, -1.35);
+  camera.add(vrMenuGroup);
+  const items = [
+    { label:'🎮 Start / Next', action: ()=>{ if(!gameActive) startGame(); else newRound(); } },
+    { label:'🔊 Repeat',       action: ()=> document.getElementById('repeatBtn').click() },
+    { label:'🗺️ Free Explore', action: ()=> document.getElementById('freeBtn').click() },
+    { label:'🏠 Home',         action: ()=> document.getElementById('homeBtn').click() }
+  ];
+  const spacing = 0.42, totalW = (items.length-1)*spacing;
+  vrMenuButtons = [];
+  items.forEach((it,i)=>{
+    const c = makeTextCanvas(it.label, 420, 170, 28, true);
+    const tex = new THREE.CanvasTexture(c);
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.38,0.155),
+      new THREE.MeshBasicMaterial({ map:tex, transparent:true, depthTest:false }));
+    mesh.position.set(-totalW/2 + i*spacing, 0, 0);
+    mesh.renderOrder = 999;
+    mesh.userData = { isMenuButton:true, action: it.action };
+    vrMenuGroup.add(mesh);
+    vrMenuButtons.push(mesh);
+  });
+}
+
+function clearVRChoicePanel(){
+  if (vrPanelGroup){ camera.remove(vrPanelGroup); vrPanelGroup = null; }
+  vrInteractiveButtons = [];
+  currentChoiceCallback = null;
+  currentMultiCallback = null;
+  multiSelectedValues = new Set();
+  vrDomBtnMap = null;
+}
+
+function buildVRChoicePanel(title, options, multi){
+  clearVRChoicePanel();
+  vrPanelGroup = new THREE.Group();
+  vrPanelGroup.position.set(0, -0.05, -1.3);
+  camera.add(vrPanelGroup);
+
+  const titleCanvas = makeTextCanvas(title, 900, 130, 34, false);
+  const titleMesh = new THREE.Mesh(new THREE.PlaneGeometry(1.35, 0.195),
+    new THREE.MeshBasicMaterial({ map:new THREE.CanvasTexture(titleCanvas), transparent:true, depthTest:false }));
+  titleMesh.position.set(0, 0.24, 0);
+  titleMesh.renderOrder = 999;
+  vrPanelGroup.add(titleMesh);
+
+  const n = options.length;
+  const perRow = n > 3 ? Math.ceil(n/2) : n;
+  const spacingX = 0.42, spacingY = 0.22;
+  options.forEach((opt,i)=>{
+    const row = Math.floor(i/perRow), col = i%perRow;
+    const rowCount = row === Math.floor((n-1)/perRow) ? (n - row*perRow) : perRow;
+    const rowW = (rowCount-1)*spacingX;
+    const c = makeTextCanvas(opt.label, 420, 200, 32, true);
+    const tex = new THREE.CanvasTexture(c);
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.38, 0.18),
+      new THREE.MeshBasicMaterial({ map:tex, transparent:true, depthTest:false }));
+    mesh.position.set(-rowW/2 + col*spacingX, -0.02 - row*spacingY, 0);
+    mesh.renderOrder = 999;
+    mesh.userData = { isVRButton:true, value: opt.value, label: opt.label };
+    vrPanelGroup.add(mesh);
+    vrInteractiveButtons.push(mesh);
+  });
+
+  if (multi){
+    const rows = Math.ceil(n/perRow);
+    const c = makeTextCanvas('✔ Confirm', 420, 200, 32, true, '#fff3d6');
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.38, 0.18),
+      new THREE.MeshBasicMaterial({ map:new THREE.CanvasTexture(c), transparent:true, depthTest:false }));
+    mesh.position.set(0, -0.02 - rows*spacingY, 0);
+    mesh.renderOrder = 999;
+    mesh.userData = { isVRButton:true, isConfirm:true };
+    vrPanelGroup.add(mesh);
+    vrInteractiveButtons.push(mesh);
+  }
+
+  vrPanelGroup.visible = inVRSession;
+}
+
+function refreshVRButtonTexture(mesh, selected){
+  const c = makeTextCanvas(mesh.userData.label, 420, 200, 32, true, selected ? '#ffe6ad' : '#ffffff');
+  mesh.material.map.dispose();
+  mesh.material.map = new THREE.CanvasTexture(c);
+  mesh.material.needsUpdate = true;
+}
+
+function handleVRButtonSelect(mesh){
+  const ud = mesh.userData;
+  if (ud.isMenuButton){ ud.action(); return; }
+  if (ud.isConfirm){
+    if (currentMultiCallback) currentMultiCallback([...multiSelectedValues]);
+    return;
+  }
+  if (currentMultiCallback){
+    const has = multiSelectedValues.has(ud.value);
+    if (has) multiSelectedValues.delete(ud.value); else multiSelectedValues.add(ud.value);
+    refreshVRButtonTexture(mesh, !has);
+    const domBtn = vrDomBtnMap && vrDomBtnMap.get(ud.value);
+    if (domBtn) domBtn.classList.toggle('selected', !has);
+  } else if (currentChoiceCallback){
+    currentChoiceCallback(ud.value);
+  }
+}
+
+function setVRUIVisible(visible){
+  if (vrHUDGroup) vrHUDGroup.visible = visible;
+  if (vrMenuGroup) vrMenuGroup.visible = visible;
+  if (vrPanelGroup) vrPanelGroup.visible = visible;
+}
+
+/* ------------------------- 8. GAME ENGINE -------------------------------- */
+
+const promptEl = document.getElementById('prompt');
+const feedbackEl = document.getElementById('feedback');
+
+function setPrompt(t){
+  promptEl.textContent = t;
+  currentPromptText = t;
+  refreshVRHUD();
+}
+function setFeedback(t, ok){
+  feedbackEl.textContent = t;
+  feedbackEl.classList.toggle('show', !!t);
+  feedbackEl.classList.toggle('good', ok===true);
+  feedbackEl.classList.toggle('bad', ok===false);
+  currentFeedbackText = t;
+  currentFeedbackOk = ok;
+  refreshVRHUD();
+}
+
+let gameActive = false;
+let currentRound = null; // holds per-mode round state
+let lastRoundStartTs = 0;
+
+function activePool(){
+  const size = diffCfg().poolSize;
+  // deterministic-ish shuffle each round for variety
+  const shuffled = [...objectsList].sort(()=>Math.random()-0.5);
+  return shuffled.slice(0, Math.min(size, objectsList.length));
+}
+
+function resetAllHighlights(){ objectsList.forEach(g=>setHighlight(g,false)); }
+
+function startGame(){
+  gameActive = true;
+  sessionScore = 0; sessionEvents.length = 0; streak = {correct:0, incorrect:0}; currentDifficulty='easy';
+  updateBadge();
+  speak('Hello! Let us play a memory game together. Look carefully at the kitchen.');
+  setTimeout(newRound, 1600);
+}
+
+function newRound(){
+  if (!gameActive) return;
+  resetAllHighlights();
+  document.getElementById('choicePanel').style.display = 'none';
+  clearVRChoicePanel();
+  lastRoundStartTs = performance.now();
+  switch(settings.gameMode){
+    case 'recognition': return startRecognition();
+    case 'location':    return startLocation();
+    case 'sequence':    return startSequence();
+    case 'matching':    return startMatching();
+    case 'category':    return startCategory();
+    case 'shortterm':   return startShortTerm();
+  }
+}
+
+function elapsedSeconds(){ return (performance.now() - lastRoundStartTs)/1000; }
+
+/* ---- Mode 1: Object Recognition ---- */
+function startRecognition(){
+  const pool = activePool();
+  const target = pool[Math.floor(Math.random()*pool.length)];
+  currentRound = { mode:'recognition', target, attempts:0 };
+  setPrompt('🔎 Find the ' + target.userData.friendly);
+  setFeedback('', null);
+  speak('Find the ' + target.userData.friendly);
+}
+function handleRecognitionClick(grp){
+  const r = currentRound; r.attempts++;
+  if (grp === r.target){
+    bounce(grp); setHighlight(grp, true, 0x8fe3a0);
+    setFeedback('✅ Well done! That is the ' + grp.userData.friendly + '.', true);
+    speak('Well done! That is the ' + grp.userData.friendly + '.');
+    recordEvent({ gameType:'object_recognition', object: grp.userData.name, correct:true, responseTime: elapsedSeconds(), attempts: r.attempts });
+    askComprehensionQuestion(grp, ()=> setTimeout(newRound, 900));
+  } else {
+    setFeedback('That is the ' + grp.userData.friendly + '. Let us try again!', false);
+    speak('That is the ' + grp.userData.friendly + '. Try again.');
+    if (r.attempts >= 3){
+      recordEvent({ gameType:'object_recognition', object: r.target.userData.name, correct:false, responseTime: elapsedSeconds(), attempts:r.attempts });
+      setTimeout(newRound, 1800);
+    }
+  }
+}
+
+/* ---- Mode 2: Object Location Memory ---- */
+function startLocation(){
+  const pool = activePool();
+  const target = pool[Math.floor(Math.random()*pool.length)];
+  currentRound = { mode:'location', target, phase:'viewing', attempts:0 };
+  setHighlight(target, true, 0xffd166);
+  setPrompt('📍 The ' + target.userData.friendly + ' is here. Remember its location.');
+  setFeedback('', null);
+  speak('Remember where the ' + target.userData.friendly + ' is.');
+  setTimeout(()=>{
+    if (!gameActive || currentRound?.mode !== 'location') return;
+    setHighlight(target, false);
+    currentRound.phase = 'recall';
+    lastRoundStartTs = performance.now();
+    setPrompt('🤔 Where was the ' + target.userData.friendly + '? Tap the spot.');
+    speak('Where was the ' + target.userData.friendly + '?');
+  }, diffCfg().viewSeconds * 1000);
+}
+function handleLocationClick(grp){
+  const r = currentRound;
+  if (r.phase !== 'recall') return;
+  r.attempts++;
+  const correct = grp === r.target;
+  if (correct){
+    bounce(grp); setHighlight(grp,true,0x8fe3a0);
+    setFeedback('✅ Correct! That is exactly where it was.', true);
+    speak('Correct! Well remembered.');
+    recordEvent({ gameType:'location_memory', object:r.target.userData.name, correct:true, responseTime: elapsedSeconds(), attempts:r.attempts });
+    setTimeout(newRound, 2000);
+  } else {
+    setFeedback('Not quite that spot. Try again — take your time.', false);
+    speak('That is okay. Try again.');
+    if (r.attempts >= 3){
+      recordEvent({ gameType:'location_memory', object:r.target.userData.name, correct:false, responseTime: elapsedSeconds(), attempts:r.attempts });
+      setTimeout(newRound, 1800);
+    }
+  }
+}
+
+/* ---- Mode 3: Sequence Memory ---- */
+function startSequence(){
+  const pool = activePool();
+  const len = Math.min(diffCfg().seqLen, pool.length);
+  const seq = [...pool].sort(()=>Math.random()-0.5).slice(0,len);
+  currentRound = { mode:'sequence', seq, step:0, attempts:0, wrongInRound:false };
+  setPrompt('🧠 Watch and remember this order:');
+  setFeedback('', null);
+  speak('Remember these objects in order.');
+  seq.forEach((grp, i)=>{
+    setTimeout(()=>{
+      if (!gameActive || currentRound?.mode!=='sequence') return;
+      resetAllHighlights();
+      setHighlight(grp, true, 0xffd166);
+      speak(grp.userData.friendly);
+    }, 900 + i*1500);
+  });
+  setTimeout(()=>{
+    if (!gameActive || currentRound?.mode!=='sequence') return;
+    resetAllHighlights();
+    lastRoundStartTs = performance.now();
+    setPrompt('👉 Now tap the objects in the same order (1 of ' + seq.length + ').');
+    speak('Now select them in the same order.');
+  }, 900 + seq.length*1500 + 400);
+}
+function handleSequenceClick(grp){
+  const r = currentRound;
+  if (performance.now() - lastRoundStartTs < 900 + r.seq.length*1500 + 300) return; // still in preview phase
+  r.attempts++;
+  if (grp === r.seq[r.step]){
+    bounce(grp); setHighlight(grp,true,0x8fe3a0);
+    r.step++;
+    if (r.step >= r.seq.length){
+      setFeedback('✅ Perfect sequence! Excellent memory.', true);
+      speak('Excellent! You remembered the whole sequence.');
+      recordEvent({ gameType:'sequence_memory', object: r.seq.map(o=>o.userData.name).join('>'), correct:!r.wrongInRound, responseTime: elapsedSeconds(), attempts:r.attempts });
+      setTimeout(newRound, 2200);
+    } else {
+      setPrompt('👉 Good! Now tap object ' + (r.step+1) + ' of ' + r.seq.length + '.');
+      speak('Good. Next one.');
+    }
+  } else {
+    r.wrongInRound = true;
+    setFeedback('That is okay — keep going, remember the order.', false);
+    speak('Not quite. Keep trying.');
+  }
+}
+
+/* ---- Mode 4: Object Matching ---- */
+function startMatching(){
+  const pool = activePool();
+  // pick a clue object whose category has at least one other match in pool
+  const candidates = pool.filter(g => pool.some(o=>o!==g && o.userData.category===g.userData.category));
+  const clue = (candidates.length ? candidates : pool)[Math.floor(Math.random()*(candidates.length||pool.length))];
+  currentRound = { mode:'matching', clue, attempts:0 };
+  setPrompt('🔗 Find another object used for ' + describeCategory(clue.userData.category) + ' (not the ' + clue.userData.friendly + ').');
+  setFeedback('', null);
+  speak('Find another object used for ' + describeCategory(clue.userData.category) + '.');
+}
+function describeCategory(cat){
+  const labels = { drinking:'drinking', cooking:'cooking', serving:'serving food', storage:'storing food', food:'eating', cutting:'cutting' };
+  return labels[cat] || cat;
+}
+function handleMatchingClick(grp){
+  const r = currentRound; r.attempts++;
+  if (grp !== r.clue && grp.userData.category === r.clue.userData.category){
+    bounce(grp); setHighlight(grp,true,0x8fe3a0);
+    setFeedback('✅ Great match! Both are used for ' + describeCategory(grp.userData.category) + '.', true);
+    speak('Great match!');
+    recordEvent({ gameType:'object_matching', object:grp.userData.name, correct:true, responseTime: elapsedSeconds(), attempts:r.attempts });
+    setTimeout(newRound, 2000);
+  } else {
+    setFeedback('Not quite a match. Think about what it is used for.', false);
+    speak('That is okay. Try another one.');
+    if (r.attempts >= 3){
+      recordEvent({ gameType:'object_matching', object:r.clue.userData.name, correct:false, responseTime: elapsedSeconds(), attempts:r.attempts });
+      setTimeout(newRound, 1800);
+    }
+  }
+}
+
+/* ---- Mode 5: Category Recognition (answered via choice panel — flat + VR) ---- */
+function startCategory(){
+  const pool = activePool();
+  const target = pool[Math.floor(Math.random()*pool.length)];
+  const distractors = pool.filter(o=>o!==target && o.userData.category!==target.userData.category).sort(()=>Math.random()-0.5).slice(0,2);
+  const choices = [target, ...distractors].sort(()=>Math.random()-0.5);
+  currentRound = { mode:'category', target };
+  setPrompt('❓ Which of these is used for ' + describeCategory(target.userData.category) + '?');
+  setFeedback('', null);
+  speak('Which of these is used for ' + describeCategory(target.userData.category) + '?');
+  showChoicePanel('Pick one', choices.map(o=>({ label:o.userData.friendly, value:o.userData.name })), (val)=>{
+    const correct = val === target.userData.name;
+    setFeedback(correct ? '✅ That is right!' : ('Not quite — the ' + target.userData.friendly + ' was correct.'), correct);
+    speak(correct ? 'That is right!' : ('The correct answer was ' + target.userData.friendly + '.'));
+    recordEvent({ gameType:'category_recognition', object: target.userData.name, correct, responseTime: elapsedSeconds(), attempts:1 });
+    setTimeout(newRound, 2000);
+  });
+}
+
+/* ---- Mode 6: Short-Term Memory ---- */
+function startShortTerm(){
+  const pool = activePool();
+  const count = Math.min(3 + (activeDifficulty()==='hard'?2:activeDifficulty()==='medium'?1:0), pool.length);
+  const shown = [...pool].sort(()=>Math.random()-0.5).slice(0,count);
+  const distractorPool = objectsList.filter(o=>!shown.includes(o));
+  const distractors = distractorPool.sort(()=>Math.random()-0.5).slice(0, Math.min(3, distractorPool.length));
+  currentRound = { mode:'shortterm', shown, picked:new Set() };
+  setPrompt('👀 Watch carefully. Remember these objects.');
+  setFeedback('', null);
+  speak('Watch carefully and remember these objects.');
+  shown.forEach((g,i)=> setTimeout(()=>setHighlight(g,true,0xffd166), i*400));
+  setTimeout(()=>{
+    if (!gameActive || currentRound?.mode!=='shortterm') return;
+    resetAllHighlights();
+    lastRoundStartTs = performance.now();
+    setPrompt('🤔 Which objects did you see? Select them all, then Confirm.');
+    speak('Which objects did you see?');
+    const all = [...shown, ...distractors].sort(()=>Math.random()-0.5);
+    showMultiChoicePanel('Select all you remember', all.map(o=>({label:o.userData.friendly, value:o.userData.name})), (selected)=>{
+      const correctSet = new Set(shown.map(o=>o.userData.name));
+      const gotAllRight = selected.length===correctSet.size && selected.every(v=>correctSet.has(v));
+      setFeedback(gotAllRight ? '✅ Excellent memory!' : 'Good try! Some were missed — that is okay.', gotAllRight);
+      speak(gotAllRight ? 'Excellent memory!' : 'Good try.');
+      recordEvent({ gameType:'short_term_memory', object: shown.map(o=>o.userData.name).join(','), correct: gotAllRight, responseTime: elapsedSeconds(), attempts:1 });
+      setTimeout(newRound, 2200);
+    });
+  }, diffCfg().memoryDelay * 1000 / 2);
+}
+
+/* ---- Comprehension follow-up MCQ after a correct recognition ---- */
+function askComprehensionQuestion(grp, onDone){
+  const opts = grp.userData.options.map((label,i)=>({label, value:i}));
+  showChoicePanel('What do we use the ' + grp.userData.friendly + ' for?', opts, (val)=>{
+    const correct = val === 0; // first option is always the correct one by convention above
+    setFeedback(correct ? '✅ Correct — ' + grp.userData.options[0] + '.' : 'Good try! It is actually for: ' + grp.userData.options[0] + '.', correct);
+    speak(correct ? 'Correct!' : ('It is actually for ' + grp.userData.options[0] + '.'));
+    onDone();
+  });
+}
+
+/* ---- Central click dispatcher (used for both mouse taps and VR trigger taps on 3D objects) ---- */
+function dispatchClick(grp){
+  if (!gameActive || !currentRound) return;
+  switch(currentRound.mode){
+    case 'recognition': return handleRecognitionClick(grp);
+    case 'location':    return handleLocationClick(grp);
+    case 'sequence':    return handleSequenceClick(grp);
+    case 'matching':    return handleMatchingClick(grp);
+    default: return; // category & shortterm use the choice panel, not 3D clicks
+  }
+}
+
+/* --------------------- MCQ / choice panel helpers ------------------------ */
+/* Each call builds BOTH the flat DOM panel and the matching in-VR 3D panel,
+   so the same question works whether the person is on a screen or in a headset. */
+
+function showChoicePanel(title, options, onPick){
+  const panel = document.getElementById('choicePanel');
+  document.getElementById('choiceTitle').textContent = title;
+  const optsDiv = document.getElementById('choiceOptions');
+  optsDiv.innerHTML = '';
+
+  const finish = (val)=>{ panel.style.display='none'; clearVRChoicePanel(); onPick(val); };
+
+  options.forEach(opt=>{
+    const btn = document.createElement('button');
+    btn.className = 'choice-btn'; btn.textContent = opt.label;
+    btn.onclick = ()=> finish(opt.value);
+    optsDiv.appendChild(btn);
+  });
+  panel.style.display = 'block';
+
+  buildVRChoicePanel(title, options, false);
+  currentChoiceCallback = finish;
+}
+
+function showMultiChoicePanel(title, options, onConfirm){
+  const panel = document.getElementById('choicePanel');
+  document.getElementById('choiceTitle').textContent = title;
+  const optsDiv = document.getElementById('choiceOptions');
+  optsDiv.innerHTML = '';
+  const selected = new Set();
+  const btnMap = new Map();
+
+  const finish = (val)=>{ panel.style.display='none'; clearVRChoicePanel(); onConfirm(val); };
+
+  options.forEach(opt=>{
+    const btn = document.createElement('button');
+    btn.className = 'choice-btn'; btn.textContent = opt.label;
+    btn.onclick = ()=>{
+      if (selected.has(opt.value)){ selected.delete(opt.value); btn.classList.remove('selected'); }
+      else { selected.add(opt.value); btn.classList.add('selected'); }
+      multiSelectedValues = selected;
+    };
+    btnMap.set(opt.value, btn);
+    optsDiv.appendChild(btn);
+  });
+  const confirmBtn = document.createElement('button');
+  confirmBtn.className = 'choice-btn'; confirmBtn.style.background='var(--gold)'; confirmBtn.style.borderColor='var(--gold)';
+  confirmBtn.textContent = '✔ Confirm';
+  confirmBtn.onclick = ()=> finish([...selected]);
+  optsDiv.appendChild(confirmBtn);
+  panel.style.display = 'block';
+
+  buildVRChoicePanel(title, options, true);
+  multiSelectedValues = selected;
+  vrDomBtnMap = btnMap;
+  currentMultiCallback = finish;
+}
+
+/* --------------------------- 9. UI WIRING --------------------------------- */
+
+document.getElementById('startBtn').onclick = startGame;
+document.getElementById('newRoundBtn').onclick = ()=>{ if(!gameActive) startGame(); else newRound(); };
+document.getElementById('repeatBtn').onclick = ()=>{
+  if (currentRound?.target) speak('Find the ' + currentRound.target.userData.friendly);
+  else if (currentRound?.clue) speak('Find another object used for ' + describeCategory(currentRound.clue.userData.category));
+  else speak(promptEl.textContent);
+};
+document.getElementById('freeBtn').onclick = ()=>{
+  gameActive = false; currentRound = null; resetAllHighlights();
+  document.getElementById('choicePanel').style.display = 'none';
+  clearVRChoicePanel();
+  setPrompt('🗺️ Free Explore: tap any object to hear its name.');
+  setFeedback('', null);
+};
+document.getElementById('homeBtn').onclick = ()=>{
+  gameActive = false; currentRound = null; resetAllHighlights();
+  document.getElementById('choicePanel').style.display = 'none';
+  clearVRChoicePanel();
+  controls.target.set(0, 1.1, -0.4);
+  camera.position.set(0, 1.7, 4.4);
+  controls.update();
+  setPrompt('Welcome! Tap "🎮 Start Game" to begin.');
+  setFeedback('', null);
+};
+
+const settingsPanel = document.getElementById('settingsPanel');
+document.getElementById('settingsBtn').onclick = ()=> settingsPanel.style.display = (settingsPanel.style.display==='block'?'none':'block');
+document.getElementById('closeSettings').onclick = ()=> settingsPanel.style.display = 'none';
+
+document.getElementById('modeSelect').onchange = (e)=>{ settings.gameMode = e.target.value; updateBadge(); };
+document.getElementById('difficultySelect').onchange = (e)=>{ settings.difficultyMode = e.target.value; updateBadge(); };
+document.getElementById('fontSlider').oninput = (e)=>{ settings.fontScale = parseFloat(e.target.value); document.documentElement.style.setProperty('--ui-scale', settings.fontScale); };
+document.getElementById('volumeSlider').oninput = (e)=>{ settings.voiceVolume = parseFloat(e.target.value); };
+document.getElementById('speedSlider').oninput = (e)=>{ settings.speechRate = parseFloat(e.target.value); };
+document.getElementById('contrastToggle').onchange = (e)=>{ settings.highContrast = e.target.checked; document.body.classList.toggle('high-contrast', settings.highContrast); };
+document.getElementById('exportBtn').onclick = exportSessionData;
+
+/* ------------------- 10. INTERACTION (pointer + VR) ------------------------ */
+
+function getRootGroup(obj){
+  let o = obj;
+  while (o.parent && !objectsList.includes(o)) o = o.parent;
+  return objectsList.includes(o) ? o : null;
+}
+
+function onPointerDown(e){
+  if (inVRSession) return; // in VR, only the controller trigger drives interaction
+  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(objectsList, true);
+  if (hits.length > 0){
+    const grp = getRootGroup(hits[0].object);
+    if (grp) handleObjectTap(grp);
+  }
+}
+
+const _vrRaycaster = new THREE.Raycaster();
+function controllerRay(controller){
+  const m = new THREE.Matrix4().identity().extractRotation(controller.matrixWorld);
+  _vrRaycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+  _vrRaycaster.ray.direction.set(0,0,-1).applyMatrix4(m);
+  return _vrRaycaster;
+}
+
+function onVRSelect(event){
+  const controller = event.target;
+  const rc = controllerRay(controller);
+
+  // Priority 1: the in-VR choice/MCQ panel (if a question is showing)
+  if (vrInteractiveButtons.length){
+    const bHits = rc.intersectObjects(vrInteractiveButtons, false);
+    if (bHits.length){ handleVRButtonSelect(bHits[0].object); return; }
+  }
+  // Priority 2: the always-on VR menu (Start/Repeat/Explore/Home)
+  if (vrMenuButtons.length){
+    const mHits = rc.intersectObjects(vrMenuButtons, false);
+    if (mHits.length){ handleVRButtonSelect(mHits[0].object); return; }
+  }
+  // Priority 3: the interactive kitchen objects themselves
+  const hits = rc.intersectObjects(objectsList, true);
+  if (hits.length > 0){
+    const grp = getRootGroup(hits[0].object);
+    if (grp) handleObjectTap(grp);
+  }
+}
+
+/* Keeps each controller's pointer ray + cursor dot visually landing exactly
+   on whatever it is currently aimed at (panel button, menu button, or a
+   kitchen object), which is standard, expected VR pointer feedback. */
+function updateControllerPointers(){
+  if (!inVRSession) return;
+  const targetSets = [];
+  if (vrInteractiveButtons.length) targetSets.push(vrInteractiveButtons);
+  if (vrMenuButtons.length) targetSets.push(vrMenuButtons);
+  targetSets.push(objectsList);
+
+  controllers.forEach(controller=>{
+    const rc = controllerRay(controller);
+    let dist = 2;
+    for (const set of targetSets){
+      const hits = rc.intersectObjects(set, true);
+      if (hits.length){ dist = hits[0].distance; break; }
+    }
+    const line = controller.getObjectByName('pointerRay');
+    const cursor = controller.getObjectByName('cursorDot');
+    if (line) line.scale.z = dist;
+    if (cursor) cursor.position.z = -dist;
+  });
+}
+
+function handleObjectTap(grp){
+  if (gameActive && currentRound){
+    dispatchClick(grp);
+  } else {
+    // Free explore: name the object + gentle bounce
+    bounce(grp);
+    speak(grp.userData.friendly);
+    setPrompt('That is the ' + grp.userData.friendly + '.');
+  }
+}
+
+/* --------------------------- 11. RENDER LOOP ------------------------------ */
+
+function animate(){
+  renderer.setAnimationLoop(()=>{
+    if (!inVRSession) controls.update();
+    updateControllerPointers();
+    renderer.render(scene, camera);
+  });
+}
+
+/* -------------------------------- BOOT ------------------------------------ */
+
+init();
+buildRoom();
+buildObjects();
+createVRHUD();
+createVRMenu();
+updateBadge();
+animate();
+</script>
+</body>
+</html>
